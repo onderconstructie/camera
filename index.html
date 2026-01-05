@@ -41,6 +41,7 @@
             background: var(--white);
             border-bottom: 1px solid var(--slate-200);
             padding: 1.5rem;
+            position: relative; /* Nodig voor de terug-link */
         }
 
         .header-content {
@@ -50,6 +51,31 @@
             align-items: center;
             justify-content: center;
             gap: 16px;
+        }
+
+        /* De Terug-link (Stijl zoals andere pagina) */
+        .back-link {
+            position: absolute;
+            left: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px; 
+            text-decoration: none;
+            color: var(--slate-500); 
+            font-weight: 500; 
+            font-size: 1rem;
+            transition: color 0.2s ease;
+            z-index: 10;
+        }
+        .back-link:hover { color: var(--accent); }
+        .back-link svg { width: 20px; height: 20px; stroke-width: 2; }
+
+        @media (max-width: 600px) {
+            .back-link span { display: none; } 
+            .back-link { left: 1rem; }
+            .header { padding: 1rem; }
         }
 
         .logo-circle {
@@ -238,6 +264,14 @@
 <body>
 
     <header class="header">
+        <a href="https://onderconstructie.github.io/fun" class="back-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            <span>Fun</span>
+        </a>
+
         <div class="header-content">
             <div class="logo-circle">
                 <svg viewBox="0 0 32 32">
