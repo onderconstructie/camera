@@ -41,7 +41,7 @@
             background: var(--white);
             border-bottom: 1px solid var(--slate-200);
             padding: 1.5rem;
-            position: relative; /* Nodig voor de terug-link */
+            position: relative;
         }
 
         .header-content {
@@ -53,7 +53,7 @@
             gap: 16px;
         }
 
-        /* De Terug-link (Stijl zoals andere pagina) */
+        /* De Terug-link */
         .back-link {
             position: absolute;
             left: 1.5rem;
@@ -101,7 +101,7 @@
         h1 { font-size: 1.5rem; font-weight: 800; color: var(--slate-800); margin: 0; line-height: 1; }
         .subtitle { font-size: 0.875rem; color: var(--slate-500); margin-top: 4px; font-weight: 500; }
 
-        /* Main Content Grid */
+        /* Grid Layout */
         .container {
             max-width: 1100px;
             margin: 2rem auto;
@@ -222,7 +222,7 @@
         .icon-label { font-size: 0.75rem; font-weight: 600; color: var(--slate-800); text-align: center; }
 
         /* Buttons & Details */
-        .btn-restart {
+        .btn-action {
             width: 100%;
             padding: 0.875rem;
             background: var(--white);
@@ -231,13 +231,19 @@
             font-weight: 700;
             color: var(--slate-700);
             cursor: pointer;
-            margin-bottom: 1.5rem;
+            margin-bottom: 0.75rem;
             transition: 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
-        .btn-restart:hover { border-color: var(--accent); background: var(--green-50); color: var(--accent); }
+        .btn-action:hover { border-color: var(--accent); background: var(--green-50); color: var(--accent); }
+        
+        .btn-action svg { width: 18px; height: 18px; }
 
-        details { border-top: 1px solid var(--slate-100); }
+        details { border-top: 1px solid var(--slate-100); margin-top: 1rem; }
         summary { padding: 1rem 0; font-size: 0.8125rem; font-weight: 700; color: var(--slate-500); cursor: pointer; list-style: none; display: flex; justify-content: space-between; }
         
         .info-text { font-size: 0.75rem; color: var(--slate-500); line-height: 1.6; margin: 0; padding-bottom: 0.5rem; }
@@ -313,7 +319,22 @@
             <div id="iconGrid" class="icon-grid">
                 </div>
             
-            <button class="btn-restart" onclick="location.reload()">Sessie herstarten</button>
+            <button class="btn-action" onclick="toggleCamera()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 10c0-4.418-3.582-8-8-8s-8 3.582-8 8c0 1.965.71 3.766 1.89 5.168"/>
+                    <path d="M4 10h4v-4"/>
+                    <path d="M4 14c0 4.418 3.582 8 8 8s8-3.582 8-8c0-1.965-.71-3.766-1.89-5.168"/>
+                    <path d="M20 14h-4v4"/>
+                </svg>
+                Camera Wisselen
+            </button>
+            <button class="btn-action" onclick="location.reload()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M23 4v6h-6"></path>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                Sessie herstarten
+            </button>
 
             <details>
                 <summary>Hoe werkt dit? <span>▼</span></summary>
@@ -342,8 +363,9 @@
         let model;
         let seenObjects = new Set();
         let confidenceThreshold = 0.65;
+        let currentFacingMode = 'environment'; // Start met camera aan de achterkant
 
-        // Icoon Definities (Specifieke SVG's)
+        // Icoon Definities
         const iconPaths = {
             'person': '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>',
             'cell phone': '<rect x="6" y="3" width="12" height="18" rx="2"></rect><circle cx="12" cy="18" r="1"></circle>',
@@ -381,42 +403,79 @@
             threshDisplay.innerText = e.target.value + '%';
         };
 
+        // Functie om de camera stroom op te zetten (en oude te stoppen)
+        async function setupCamera() {
+            if (video.srcObject) {
+                const tracks = video.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: currentFacingMode } 
+                });
+                video.srcObject = stream;
+                
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        resolve();
+                    };
+                });
+            } catch (err) {
+                loaderStatus.innerHTML = "<span style='color:#ef4444;'>Camera fout of geen toegang.</span>";
+                console.error(err);
+            }
+        }
+
+        // Functie om van camera te wisselen
+        async function toggleCamera() {
+            // Wissel modus
+            currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+            
+            // Toon loader tijdens wissel
+            loader.style.display = 'flex';
+            loaderStatus.innerText = "Camera wisselen...";
+            
+            await setupCamera();
+            
+            loader.style.display = 'none';
+        }
+
         async function init() {
             try {
                 model = await cocoSsd.load();
                 loaderStatus.innerText = "Camera activeren...";
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                video.srcObject = stream;
-                video.onloadedmetadata = () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    loader.style.display = 'none';
-                    loop();
-                };
+                await setupCamera();
+                loader.style.display = 'none';
+                loop();
             } catch (err) {
-                loaderStatus.innerHTML = "<span style='color:#ef4444;'>Camera niet gevonden</span>";
+                loaderStatus.innerHTML = "<span style='color:#ef4444;'>AI Model kon niet laden.</span>";
             }
         }
 
         async function loop() {
-            const predictions = await model.detect(video);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            predictions.forEach(p => {
-                if (p.score > confidenceThreshold) {
-                    ctx.strokeStyle = '#10b981';
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(...p.bbox);
-                    if (!seenObjects.has(p.class)) {
-                        seenObjects.add(p.class);
-                        const nlLabel = vertaling[p.class] || p.class; // Fallback naar Engels indien onbekend
-                        const svg = iconPaths[p.class] || iconPaths['default'];
-                        const div = document.createElement('div');
-                        div.className = 'styled-icon-box';
-                        div.innerHTML = `<div class="icon-circle"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">${svg}</svg></div><div class="icon-label">${nlLabel}</div>`;
-                        iconGrid.appendChild(div);
+            if (!video.paused && !video.ended) {
+                const predictions = await model.detect(video);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                predictions.forEach(p => {
+                    if (p.score > confidenceThreshold) {
+                        ctx.strokeStyle = '#10b981';
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(...p.bbox);
+                        if (!seenObjects.has(p.class)) {
+                            seenObjects.add(p.class);
+                            const nlLabel = vertaling[p.class] || p.class;
+                            const svg = iconPaths[p.class] || iconPaths['default'];
+                            const div = document.createElement('div');
+                            div.className = 'styled-icon-box';
+                            div.innerHTML = `<div class="icon-circle"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">${svg}</svg></div><div class="icon-label">${nlLabel}</div>`;
+                            iconGrid.appendChild(div);
+                        }
                     }
-                }
-            });
+                });
+            }
             requestAnimationFrame(loop);
         }
         init();
