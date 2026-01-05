@@ -3,27 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Napoleon Lookalike</title>
+    <title>AI Camera — Real-time Objectherkenning</title>
     
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
     
     <style>
-        /* --- Huisstijl Definities --- */
         :root {
             --slate-50: #f8fafc;
+            --slate-100: #f1f5f9;
             --slate-200: #e2e8f0;
             --slate-400: #94a3b8;
             --slate-500: #64748b;
             --slate-700: #334155;
-            --slate-800: #1e293b; /* Donker Slate voor de hoed en actieve staat */
+            --slate-800: #1e293b;
             --white: #ffffff;
-            --accent: #10b981; /* Emerald */
+            --accent: #10b981;
             --green-50: #f0fdf4;
-            --green-700: #15803d;
             --radius-lg: 16px;
             --radius-md: 12px;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+            --radius-sm: 8px;
         }
 
         body {
@@ -37,79 +36,203 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* --- Header & Vernieuwd Logo --- */
-        .header { background: var(--white); border-bottom: 1px solid var(--slate-200); padding: 1.5rem; }
-        .header-content { max-width: 900px; margin: 0 auto; display: flex; align-items: center; justify-content: center; gap: 16px; }
-        
-        .logo-circle {
-            width: 56px; height: 56px; background: var(--green-50); border: 2px solid var(--accent);
-            border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        /* Header */
+        .header {
+            background: var(--white);
+            border-bottom: 1px solid var(--slate-200);
+            padding: 1.5rem;
         }
-        
-        /* Nieuw, gedetailleerder logo */
-        .logo-circle svg { width: 38px; height: 38px; }
+
+        .header-content {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+
+        .logo-circle {
+            width: 42px;
+            height: 42px;
+            background: var(--green-50);
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .logo-circle svg {
+            width: 24px;
+            height: 24px;
+            stroke: var(--accent);
+            fill: none;
+            stroke-width: 2;
+        }
 
         h1 { font-size: 1.5rem; font-weight: 800; color: var(--slate-800); margin: 0; line-height: 1; }
         .subtitle { font-size: 0.875rem; color: var(--slate-500); margin-top: 4px; font-weight: 500; }
 
-        /* --- Layout Container --- */
+        /* Main Content Grid */
         .container {
-            max-width: 800px; margin: 2rem auto; padding: 0 1.5rem; flex: 1; width: 100%;
-            box-sizing: border-box; display: flex; flex-direction: column; align-items: center;
+            max-width: 1100px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 2rem;
+            flex: 1;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .card {
-            background: var(--white); border-radius: var(--radius-lg); border: 1.5px solid var(--slate-200);
-            padding: 1.5rem; display: flex; flex-direction: column; position: relative; width: 100%; box-shadow: var(--shadow-sm);
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            border: 1.5px solid var(--slate-200);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            position: relative;
         }
 
-        /* --- Loader --- */
+        .card-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--slate-400);
+            margin-bottom: 1.25rem;
+        }
+
+        /* Loader */
         #loader {
-            position: absolute; inset: 0; background: var(--white); z-index: 20;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: var(--radius-lg);
+            position: absolute;
+            inset: 0;
+            background: var(--white);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-lg);
         }
+
         .spinner {
-            width: 44px; height: 44px; border: 3.5px solid var(--green-50); border-top: 3.5px solid var(--accent);
-            border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 1rem;
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--green-50);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 1rem;
         }
+
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* --- Canvas & Video --- */
+        /* Video Area */
         .canvas-container {
-            position: relative; border-radius: var(--radius-md); overflow: hidden;
-            background: #000; line-height: 0; aspect-ratio: 4/3; width: 100%;
-        }
-        video { display: none; } 
-        canvas { width: 100%; height: 100%; transform: scaleX(-1); display: block; }
-
-        /* --- Instructie & Feedback Box (Met soepele transitie) --- */
-        .instruction-box {
-            margin-top: 1.5rem; padding: 1.25rem; background: var(--green-50); border: 1.5px solid var(--accent);
-            border-radius: var(--radius-md); text-align: center; font-weight: 700; color: var(--slate-800);
-            font-size: 1rem; transition: all 0.4s ease-in-out;
+            position: relative;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            background: #000;
+            line-height: 0;
         }
 
-        /* --- Controls --- */
-        .controls { display: flex; gap: 1rem; margin-top: 1.5rem; width: 100%; }
-        
-        .btn-reset {
-            flex: 1; padding: 0.875rem; background: var(--white); border: 1.5px solid var(--slate-200);
-            border-radius: var(--radius-md); font-weight: 700; color: var(--slate-700); cursor: pointer;
-            transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
-        }
-        .btn-reset:hover { border-color: var(--accent); background: var(--green-50); color: var(--accent); }
+        video { width: 100%; height: auto; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
 
-        /* --- Details / Uitleg --- */
-        details { border-top: 1px solid var(--slate-200); margin-top: 1.5rem; width: 100%; }
+        /* Settings Area */
+        .settings-area {
+            margin-top: 1.5rem;
+            padding: 1.25rem;
+            background: var(--slate-50);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--slate-200);
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8125rem;
+            font-weight: 700;
+            color: var(--slate-700);
+            margin-bottom: 8px;
+        }
+
+        input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+
+        /* Icon Grid */
+        .icon-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 1.5rem;
+            min-height: 100px;
+        }
+
+        .styled-icon-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        .icon-circle {
+            width: 60px;
+            height: 60px;
+            background: var(--green-50);
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-circle svg { width: 28px; height: 28px; stroke: var(--accent); fill: none; stroke-width: 1.5; }
+        .icon-label { font-size: 0.75rem; font-weight: 600; color: var(--slate-800); text-align: center; }
+
+        /* Buttons & Details */
+        .btn-restart {
+            width: 100%;
+            padding: 0.875rem;
+            background: var(--white);
+            border: 1.5px solid var(--slate-200);
+            border-radius: var(--radius-sm);
+            font-weight: 700;
+            color: var(--slate-700);
+            cursor: pointer;
+            margin-bottom: 1.5rem;
+            transition: 0.2s;
+        }
+
+        .btn-restart:hover { border-color: var(--accent); background: var(--green-50); color: var(--accent); }
+
+        details { border-top: 1px solid var(--slate-100); }
         summary { padding: 1rem 0; font-size: 0.8125rem; font-weight: 700; color: var(--slate-500); cursor: pointer; list-style: none; display: flex; justify-content: space-between; }
+        
         .info-text { font-size: 0.75rem; color: var(--slate-500); line-height: 1.6; margin: 0; padding-bottom: 0.5rem; }
 
-        /* --- Footer Quote --- */
-        .footer { text-align: center; padding: 3rem 1rem; margin-top: auto; }
-        .footer-quote { 
-            color: var(--green-700); font-size: 1rem; font-weight: 600;
-            letter-spacing: 0.02em; display: inline-block;
+        /* Footer Style */
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            background: var(--white);
+            border-top: 1px solid var(--slate-200);
+            margin-top: 2rem;
         }
+
+        .footer-quote {
+            color: var(--accent);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 900px) { .container { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -117,16 +240,15 @@
     <header class="header">
         <div class="header-content">
             <div class="logo-circle">
-                <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 21C2 21 10 6 16 6C22 6 30 21 30 21L16 17L2 21Z" fill="#1e293b" stroke="#10b981" stroke-width="1.5" stroke-linejoin="round"/>
-                    <circle cx="16" cy="14" r="3" fill="#10b981"/>
-                    <circle cx="16" cy="14" r="2" fill="#ffffff"/>
-                    <circle cx="16" cy="14" r="1" fill="#1e293b"/>
+                <svg viewBox="0 0 32 32">
+                    <rect x="6" y="10" width="20" height="14" rx="2" />
+                    <path d="M12 10V8a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+                    <circle cx="16" cy="17" r="4" />
                 </svg>
             </div>
             <div class="title-group">
-                <h1>Napoleon Lookalike</h1>
-                <p class="subtitle">Ontdek je innerlijke keizer</p>
+                <h1>AI Camera</h1>
+                <p class="subtitle">Real-time herkenning en lokale data-analyse</p>
             </div>
         </div>
     </header>
@@ -135,230 +257,135 @@
         <div class="card">
             <div id="loader">
                 <div class="spinner"></div>
-                <p id="loaderStatus" style="font-size: 0.875rem; font-weight: 600; color: var(--slate-500); text-align: center;">
-                    AI Initialiseren...<br>Een moment geduld.
-                </p>
+                <p id="loaderStatus" style="font-size: 0.875rem; font-weight: 600; color: var(--slate-500);">Systemen opstarten...</p>
             </div>
-            
+            <h2 class="card-title">Live Analyse</h2>
             <div class="canvas-container">
-                <video id="webcam" playsinline width="640" height="480"></video>
-                <canvas id="output_canvas"></canvas>
+                <video id="webcam" autoplay muted playsinline></video>
+                <canvas id="overlay"></canvas>
             </div>
 
-            <div class="instruction-box" id="instructionText">
-                Plaats je rechterhand op je hart.
+            <div class="settings-area">
+                <div class="slider-label">
+                    <span>Gevoeligheid van de AI</span>
+                    <span id="threshVal">65%</span>
+                </div>
+                <input type="range" id="threshold" min="30" max="100" value="65">
             </div>
+        </div>
 
-            <div class="controls">
-                <button class="btn-reset" onclick="location.reload()">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                    Herstarten
-                </button>
-            </div>
+        <div class="card">
+            <h2 class="card-title">Gedetecteerde Objecten</h2>
+            <div id="iconGrid" class="icon-grid">
+                </div>
+            
+            <button class="btn-restart" onclick="location.reload()">Sessie herstarten</button>
 
             <details>
                 <summary>Hoe werkt dit? <span>▼</span></summary>
                 <div class="info-text">
-                    <p><strong>Technologie:</strong> Deze tool gebruikt MediaPipe Holistic. Dit AI-model analyseert je lichaamshouding en de positie van je handen lokaal in je browser.</p>
-                    <p style="margin-top: 8px;"><strong>Privacy:</strong> Alle data blijft op jouw apparaat en wordt niet verstuurd.</p>
+                    <p><strong>Technologie:</strong> Deze applicatie maakt gebruik van TensorFlow.js en het COCO-SSD model om objecten direct in de browser te identificeren.</p>
+                    <p style="margin-top: 8px;"><strong>Privacy:</strong> Alle berekeningen worden lokaal op dit apparaat uitgevoerd. Je videodata wordt nooit verzonden naar een externe server.</p>
                 </div>
             </details>
         </div>
     </div>
 
     <footer class="footer">
-        <span class="footer-quote">Wie zijn eigen grenzen kent, regeert.</span>
+        <span class="footer-quote">Niets is wat het lijkt.</span>
     </footer>
 
     <script>
-        const videoElement = document.getElementById('webcam');
-        const canvasElement = document.getElementById('output_canvas');
-        const ctx = canvasElement.getContext('2d');
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('overlay');
+        const ctx = canvas.getContext('2d');
+        const iconGrid = document.getElementById('iconGrid');
         const loader = document.getElementById('loader');
-        const instructionText = document.getElementById('instructionText');
+        const loaderStatus = document.getElementById('loaderStatus');
+        const threshInput = document.getElementById('threshold');
+        const threshDisplay = document.getElementById('threshVal');
 
-        let holisticModel;
-        let isProcessing = false;
-        let lastResults = null;
-        
-        // Status Variabelen voor soepele UE
-        let hatActive = false;
-        let hatTimer = 0; // Zorgt dat de hoed even blijft staan (anti-knipper)
+        let model;
+        let seenObjects = new Set();
+        let confidenceThreshold = 0.65;
 
-        // --- DE RENDER LOOP (60 FPS) ---
-        function renderLoop() {
-            ctx.save();
-            ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            // 1. Teken Video
-            ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+        // Icoon Definities (Specifieke SVG's)
+        const iconPaths = {
+            'person': '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>',
+            'cell phone': '<rect x="6" y="3" width="12" height="18" rx="2"></rect><circle cx="12" cy="18" r="1"></circle>',
+            'laptop': '<rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M2 18h20"></path>',
+            'bottle': '<path d="M10 2h4M9 5h6v12a3 3 0 0 1-3 3 3 3 0 0 1-3-3V5z"></path>',
+            'cup': '<path d="M17 8h1a4 4 0 1 1 0 8h-1"></path><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z"></path>',
+            'book': '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>',
+            'remote': '<rect x="8" y="3" width="8" height="18" rx="2"></rect><circle cx="12" cy="17" r="1"></circle><rect x="10" y="6" width="4" height="2"></rect>',
+            'default': '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line>'
+        };
 
-            // 2. Teken Hoed (als actief of timer loopt)
-            if (lastResults && lastResults.faceLandmarks) {
-                if (hatActive || hatTimer > 0) {
-                    drawPrettyHat(lastResults.faceLandmarks);
-                    if (!hatActive) hatTimer--; // Aftellen als de pose weg is
-                }
-            }
-            ctx.restore();
+        // Complete COCO-SSD Vertaallijst (80 Objecten)
+        const vertaling = { 
+            'person': 'Persoon', 'bicycle': 'Fiets', 'car': 'Auto', 'motorcycle': 'Motor', 'airplane': 'Vliegtuig',
+            'bus': 'Bus', 'train': 'Trein', 'truck': 'Vrachtwagen', 'boat': 'Boot', 'traffic light': 'Stoplicht',
+            'fire hydrant': 'Brandkraan', 'stop sign': 'Stopbord', 'parking meter': 'Parkeermeter', 'bench': 'Bankje',
+            'bird': 'Vogel', 'cat': 'Kat', 'dog': 'Hond', 'horse': 'Paard', 'sheep': 'Schaap', 'cow': 'Koe',
+            'elephant': 'Olifant', 'bear': 'Beer', 'zebra': 'Zebra', 'giraffe': 'Giraffe', 'backpack': 'Rugzak',
+            'umbrella': 'Paraplu', 'handbag': 'Handtas', 'tie': 'Stropdas', 'suitcase': 'Koffer', 'frisbee': 'Frisbee',
+            'skis': 'Ski\'s', 'snowboard': 'Snowboard', 'sports ball': 'Bal', 'kite': 'Vlieger', 'baseball bat': 'Honkbalknuppel',
+            'baseball glove': 'Honkbalhandschoen', 'skateboard': 'Skateboard', 'surfboard': 'Surfplank', 'tennis racket': 'Tennisracket',
+            'bottle': 'Fles', 'wine glass': 'Wijnglas', 'cup': 'Beker', 'fork': 'Vork', 'knife': 'Mes', 'spoon': 'Lepel',
+            'bowl': 'Kom', 'banana': 'Banaan', 'apple': 'Appel', 'sandwich': 'Broodje', 'orange': 'Sinaasappel',
+            'broccoli': 'Broccoli', 'carrot': 'Wortel', 'hot dog': 'Hotdog', 'pizza': 'Pizza', 'donut': 'Donut',
+            'cake': 'Taart', 'chair': 'Stoel', 'couch': 'Bank', 'potted plant': 'Plant', 'bed': 'Bed',
+            'dining table': 'Tafel', 'toilet': 'Toilet', 'tv': 'Televisie', 'laptop': 'Laptop', 'mouse': 'Muis',
+            'remote': 'Afstandsbediening', 'keyboard': 'Toetsenbord', 'cell phone': 'Telefoon', 'microwave': 'Magnetron',
+            'oven': 'Oven', 'toaster': 'Broodrooster', 'sink': 'Gootsteen', 'refrigerator': 'Koelkast', 'book': 'Boek',
+            'clock': 'Klok', 'vase': 'Vaas', 'scissors': 'Schaar', 'teddy bear': 'Knuffelbeer', 'hair drier': 'Föhn',
+            'toothbrush': 'Tandenborstel'
+        };
 
-            // 3. Nieuwe AI frame aanvragen als de vorige klaar is
-            if (!isProcessing && videoElement.readyState >= 2) {
-                triggerAI();
-            }
+        threshInput.oninput = (e) => {
+            confidenceThreshold = e.target.value / 100;
+            threshDisplay.innerText = e.target.value + '%';
+        };
 
-            requestAnimationFrame(renderLoop);
-        }
-
-        // --- AI TRIGGER ---
-        async function triggerAI() {
-            isProcessing = true;
+        async function init() {
             try {
-                await holisticModel.send({image: videoElement});
-            } catch (e) {
-                console.error(e);
-                isProcessing = false; // Reset bij fout
+                model = await cocoSsd.load();
+                loaderStatus.innerText = "Camera activeren...";
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    loader.style.display = 'none';
+                    loop();
+                };
+            } catch (err) {
+                loaderStatus.innerHTML = "<span style='color:#ef4444;'>Camera niet gevonden</span>";
             }
         }
 
-        // --- AI RESULTATEN VERWERKEN ---
-        function onResults(results) {
-            if (loader.style.display !== 'none') loader.style.display = 'none';
-            lastResults = results;
-            isProcessing = false;
-
-            hatActive = false; // Reset voor deze frame
-
-            // Checken of rechterhand of linkerhand (fallback) gedetecteerd is
-            if (results.poseLandmarks) {
-                if (results.rightHandLandmarks) {
-                    checkGestureSimple(results.poseLandmarks, results.rightHandLandmarks);
-                } else if (results.leftHandLandmarks) {
-                     // Soms spiegelt de AI de handen, dit vangt dat op.
-                    checkGestureSimple(results.poseLandmarks, results.leftHandLandmarks);
+        async function loop() {
+            const predictions = await model.detect(video);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            predictions.forEach(p => {
+                if (p.score > confidenceThreshold) {
+                    ctx.strokeStyle = '#10b981';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(...p.bbox);
+                    if (!seenObjects.has(p.class)) {
+                        seenObjects.add(p.class);
+                        const nlLabel = vertaling[p.class] || p.class; // Fallback naar Engels indien onbekend
+                        const svg = iconPaths[p.class] || iconPaths['default'];
+                        const div = document.createElement('div');
+                        div.className = 'styled-icon-box';
+                        div.innerHTML = `<div class="icon-circle"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">${svg}</svg></div><div class="icon-label">${nlLabel}</div>`;
+                        iconGrid.appendChild(div);
+                    }
                 }
-            }
-
-            // UI Update met soepele overgang
-            if (hatActive) {
-                hatTimer = 45; // Buffer van ~0.75 seconde
-                instructionText.style.background = "#1e293b"; // Dark slate
-                instructionText.style.color = "#ffffff";
-                instructionText.style.borderColor = "#1e293b";
-                instructionText.innerText = "Vive l'Empereur!";
-            } else if (hatTimer <= 0) {
-                // Pas terugzetten als de timer op 0 staat
-                instructionText.style.background = "#f0fdf4";
-                instructionText.style.color = "#1e293b";
-                instructionText.style.borderColor = "#10b981";
-                instructionText.innerText = "Plaats je rechterhand op je hart.";
-            }
-        }
-
-        // --- SIMPELE POSE CHECK (Afstandsbepaling) ---
-        function checkGestureSimple(pose, hand) {
-            // We vergelijken de pols met de schouder aan de 'hart-kant' (visueel links op het scherm)
-            const shoulder = pose[11]; 
-            const wrist = hand[0];    
-
-            // Bereken afstand
-            const dist = Math.sqrt(Math.pow(shoulder.x - wrist.x, 2) + Math.pow(shoulder.y - wrist.y, 2));
-
-            // Drempelwaarde: als de hand dichtbij genoeg is
-            // 0.22 is een goede balans tussen te streng en te makkelijk
-            if (dist < 0.22) { 
-                hatActive = true;
-            }
-        }
-
-        // --- DE VERNIEUWDE HOED (Met diepte) ---
-        function drawPrettyHat(faceLandmarks) {
-            const leftTemple = faceLandmarks[139];
-            const rightTemple = faceLandmarks[368];
-            const topHead = faceLandmarks[10];
-
-            // Wiskunde voor positie, schaal en rotatie
-            const headWidth = Math.sqrt(
-                Math.pow(rightTemple.x - leftTemple.x, 2) +
-                Math.pow(rightTemple.y - leftTemple.y, 2)
-            ) * canvasElement.width;
-            
-            const hatScale = headWidth * 3.2; 
-            const hatHeight = hatScale * 0.45;
-
-            const centerX = topHead.x * canvasElement.width;
-            const centerY = (topHead.y * canvasElement.height) - (hatHeight * 0.50);
-            
-            const angle = Math.atan2(
-                rightTemple.y - leftTemple.y,
-                rightTemple.x - leftTemple.x
-            );
-
-            ctx.save();
-            ctx.translate(centerX, centerY);
-            ctx.rotate(angle);
-
-            // --- 1. De Hoofdvorm met Gradient (Diepte!) ---
-            ctx.beginPath();
-            ctx.moveTo(-hatScale/2, hatHeight/2);
-            ctx.bezierCurveTo(-hatScale*0.2, -hatHeight*1.2, hatScale*0.2, -hatHeight*1.2, hatScale/2, hatHeight/2);
-            ctx.quadraticCurveTo(0, hatHeight*0.1, -hatScale/2, hatHeight/2);
-            ctx.closePath();
-
-            // Radiaal verloop voor een 3D effect
-            // Van lichter slate-blauw in het midden naar donker slate aan de randen
-            const gradient = ctx.createRadialGradient(0, -hatHeight*0.2, hatScale*0.1, 0, 0, hatScale*0.6);
-            gradient.addColorStop(0, '#475569'); // Slate-600 (Licht)
-            gradient.addColorStop(1, '#0f172a'); // Slate-900 (Donker)
-            ctx.fillStyle = gradient;
-            ctx.fill();
-
-            // --- 2. De Gouden (Emerald) Rand ---
-            ctx.lineWidth = 6;
-            ctx.strokeStyle = '#10b981'; // Emerald Accent
-            ctx.stroke();
-
-            // --- 3. De Kokarde (Driekleur Detail) ---
-            const cockadeSize = hatScale * 0.11;
-            ctx.translate(-hatScale * 0.22, -hatHeight * 0.15); 
-            
-            // Buitenste ring (Accent)
-            ctx.beginPath(); ctx.fillStyle = '#10b981'; ctx.arc(0, 0, cockadeSize, 0, Math.PI * 2); ctx.fill();
-            // Middelste ring (Wit)
-            ctx.beginPath(); ctx.fillStyle = '#ffffff'; ctx.arc(0, 0, cockadeSize * 0.65, 0, Math.PI * 2); ctx.fill();
-            // Binnenste kern (Donker)
-            ctx.beginPath(); ctx.fillStyle = '#0f172a'; ctx.arc(0, 0, cockadeSize * 0.35, 0, Math.PI * 2); ctx.fill();
-
-            ctx.restore();
-        }
-
-        // --- INITIALISATIE ---
-        async function run() {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 640, height: 480, facingMode: 'user' }
             });
-            videoElement.srcObject = stream;
-            
-            await new Promise(r => videoElement.onloadedmetadata = r);
-            canvasElement.width = videoElement.videoWidth;
-            canvasElement.height = videoElement.videoHeight;
-
-            holisticModel = new Holistic({locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`;
-            }});
-
-            holisticModel.setOptions({
-                modelComplexity: 1,
-                smoothLandmarks: true,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
-
-            holisticModel.onResults(onResults);
-            videoElement.play();
-            requestAnimationFrame(renderLoop);
+            requestAnimationFrame(loop);
         }
-
-        run();
+        init();
     </script>
 </body>
 </html>
